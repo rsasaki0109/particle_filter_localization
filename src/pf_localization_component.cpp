@@ -234,9 +234,11 @@ namespace particle_filter_localization
         auto cloud_callback =
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
-            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
-            pcl::fromROSMsg(*msg,*cloud_ptr);
-            measurementUpdate(cloud_ptr);
+            if(initial_pose_recieved_ && map_recieved_){
+                pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+                pcl::fromROSMsg(*msg,*cloud_ptr);
+                measurementUpdate(cloud_ptr);
+            }
         };
 
 

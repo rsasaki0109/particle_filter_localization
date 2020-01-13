@@ -18,7 +18,11 @@ def generate_launch_description():
         package='particle_filter_localization',
         node_executable='pf_localization_node',
         parameters=[pf_param_dir],
-        remappings=[('/pf_localization/gnss_pose','/gnss_pose'),('/pf_localization/imu','/imu')],
+        remappings=[('/pf_localization/gnss_pose','/gnss_pose'),
+                    ('/pf_localization/imu','/imu/data'),
+                    ('/pf_localization/map','/mapcloud'),
+                    ('/pf_localization/cloud','/cloud')
+                    ],
         output='screen'
         )
     

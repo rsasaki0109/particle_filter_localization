@@ -37,6 +37,7 @@ public:
     void predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc, const double dt_imu);
     void update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
     void resample();
+    void reset();
     void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
 
 private:
@@ -45,6 +46,8 @@ private:
     pcl::KdTreeFLANN<pcl::PointXYZI> kdtree_;
 
     std::mt19937 random_seed_;//Mersenne twister
+
+    double kdtree_radius_;
 
 };
 
