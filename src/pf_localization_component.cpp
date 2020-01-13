@@ -221,7 +221,7 @@ namespace particle_filter_localization
         {
             pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud;
             pcl::fromROSMsg(*msg,*input_cloud);
-            measurementUpdate(input_cloud);
+            //measurementUpdate(input_cloud);
         };
 
 
