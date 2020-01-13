@@ -68,6 +68,8 @@ extern "C" {
 
 #include <pcl/point_types.h>
 
+#include <particle_filter_localization/pf.h>
+
 namespace particle_filter_localization
 {
     class PfLocalizationComponent: public rclcpp::Node
@@ -105,6 +107,7 @@ namespace particle_filter_localization
         double previous_time_imu_;
         rclcpp::Time current_stamp_;
         geometry_msgs::msg::PoseStamped current_pose_;
+        ParticleFilter pf_;
         Eigen::VectorXd x_;
         Eigen::MatrixXd P_;
         pcl::KdTreeFLANN<pcl::PointXYZI> kdtree_;
@@ -124,6 +127,7 @@ namespace particle_filter_localization
         tf2_ros::TransformListener listener_;
         void predictUpdate(const sensor_msgs::msg::Imu input_imu_msg);
         void measurementUpdate(const geometry_msgs::msg::PoseStamped input_pose_msg, const double variance[]);
+        void measurementUpdate(const sensor_msgs::msg::PointCloud2::ConstPtr& input_cloud_msg);
         void broadcastPose();
         
         enum STATE{

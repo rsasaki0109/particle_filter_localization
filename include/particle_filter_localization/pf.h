@@ -7,7 +7,8 @@
 //#include <pcl/point_types.h>
 #include <pcl/io/io.h>
 #include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/registration/ndt.h>
+#include <pcl/common/transforms.h>
+
 namespace particle_filter_localization
 {
     
@@ -35,6 +36,7 @@ public:
     void predict();
     void update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
     void resample();
+    void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
 
 private:
     std::vector<Particle> particles_;

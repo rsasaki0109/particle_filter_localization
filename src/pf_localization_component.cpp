@@ -208,9 +208,12 @@ namespace particle_filter_localization
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
             std::cout << "map callback" << std::endl;
-            pcl::PointCloud<pcl::PointXYZI>::Ptr map_(new pcl::PointCloud<pcl::PointXYZI>);
+            //pcl::PointCloud<pcl::PointXYZI>::Ptr map_(new pcl::PointCloud<pcl::PointXYZI>);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr(new pcl::PointCloud<pcl::PointXYZI>());
             map_recieved_ = true;
-            pcl::fromROSMsg(*msg,*map_);
+            pcl::fromROSMsg(*msg,*map_ptr);
+            pf_.setMap(map_ptr);
+
         };
 
         auto cloud_callback =
@@ -218,7 +221,7 @@ namespace particle_filter_localization
         {
             pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud;
             pcl::fromROSMsg(*msg,*input_cloud);
-            //updateRelativePose(input_cloud);
+            measurementUpdate(input_cloud);
         };
 
 
@@ -349,6 +352,11 @@ namespace particle_filter_localization
         P_ = (Eigen::MatrixXd::Identity(num_error_state_, num_error_state_) - K*H) * P_;
 
         return;
+    }
+
+    void PfLocalizationComponent::measurementUpdate(const sensor_msgs::msg::PointCloud2::ConstPtr& input_cloud_msg)
+    {
+
     }
 
     void PfLocalizationComponent::broadcastPose()
