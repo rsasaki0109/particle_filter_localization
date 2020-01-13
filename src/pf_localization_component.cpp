@@ -33,6 +33,8 @@ namespace particle_filter_localization
         get_parameter("num_state",num_state_);
         declare_parameter("num_error_state",9);
         get_parameter("num_error_state",num_error_state_);
+        declare_parameter("num_particles",100);
+        get_parameter("num_particles",num_particles_);
         declare_parameter("sigma_imu_w",0.01);
         get_parameter("sigma_imu_w",sigma_imu_w_);
         declare_parameter("sigma_imu_acc",0.01);
@@ -43,6 +45,8 @@ namespace particle_filter_localization
         get_parameter("sigma_gnss_z",sigma_gnss_z_);
         declare_parameter("sigma_odom_xyz",0.2);
         get_parameter("sigma_odom_xyz",sigma_odom_xyz_);
+        declare_parameter("sigma_lidar",0.02);
+        get_parameter("sigma_lidar",sigma_lidar_);
         declare_parameter("use_gnss",true);
         get_parameter("use_gnss",use_gnss_);
         declare_parameter("use_odom",false);
@@ -145,6 +149,17 @@ namespace particle_filter_localization
             std::cout << "initial_x" << std::endl;
             std::cout << x_ << std::endl;
             std::cout << "----------------------" << std::endl;
+
+            Particle initial_particle;
+            initial_particle.pos.x() = current_pose_.pose.position.x;
+            initial_particle.pos.y() = current_pose_.pose.position.y;
+            initial_particle.pos.z() = current_pose_.pose.position.z;
+            initial_particle.quat.x() = current_pose_.pose.orientation.x;
+            initial_particle.quat.y() = current_pose_.pose.orientation.y;
+            initial_particle.quat.z() = current_pose_.pose.orientation.z;
+            initial_particle.quat.w() = current_pose_.pose.orientation.w;
+            double initial_sigma_noize = 2.0;//TODO
+            pf_.init(num_particles_, initial_sigma_noize, initial_particle);
         };
 
         auto imu_callback =
@@ -219,9 +234,9 @@ namespace particle_filter_localization
         auto cloud_callback =
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
-            pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud;
-            pcl::fromROSMsg(*msg,*input_cloud);
-            //measurementUpdate(input_cloud);
+            pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+            pcl::fromROSMsg(*msg,*cloud_ptr);
+            measurementUpdate(cloud_ptr);
         };
 
 
@@ -354,9 +369,9 @@ namespace particle_filter_localization
         return;
     }
 
-    void PfLocalizationComponent::measurementUpdate(const sensor_msgs::msg::PointCloud2::ConstPtr& input_cloud_msg)
+    void PfLocalizationComponent::measurementUpdate(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
-
+        pf_.update(cloud_ptr);
     }
 
     void PfLocalizationComponent::broadcastPose()

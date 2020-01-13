@@ -98,6 +98,7 @@ namespace particle_filter_localization
         double sigma_gnss_[3];
         double sigma_odom_xyz_;
         double sigma_odom_[3];
+        double sigma_lidar_;
         bool use_gnss_;
         bool use_odom_;
 
@@ -127,7 +128,7 @@ namespace particle_filter_localization
         tf2_ros::TransformListener listener_;
         void predictUpdate(const sensor_msgs::msg::Imu input_imu_msg);
         void measurementUpdate(const geometry_msgs::msg::PoseStamped input_pose_msg, const double variance[]);
-        void measurementUpdate(const sensor_msgs::msg::PointCloud2::ConstPtr& input_cloud_msg);
+        void measurementUpdate(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
         void broadcastPose();
         
         enum STATE{

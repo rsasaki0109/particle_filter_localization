@@ -21,6 +21,28 @@ namespace particle_filter_localization
         }
     }
 
+    void ParticleFilter::predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc, const double dt_imu)
+    {
+        Eigen::Vector3d gravity_;
+        gravity_ << 0,0,-9.80665;
+
+        Eigen::Quaterniond quat_wdt =  Eigen::Quaterniond(Eigen::AngleAxisd(imu_w.x() * dt_imu, Eigen::Vector3d::UnitX()) 
+                                            * Eigen::AngleAxisd(imu_w.y() * dt_imu, Eigen::Vector3d::UnitY())    
+                                            * Eigen::AngleAxisd(imu_w.z() * dt_imu, Eigen::Vector3d::UnitZ()));  
+        for (int i = 0; i< particles_.size(); i++){ 
+            Eigen::Quaterniond previous_quat = Eigen::Quaterniond(particles_[i].quat.w(), particles_[i].quat.x(), particles_[i].quat.y(), particles_[i].quat.z());
+            Eigen::Matrix3d rot_mat = previous_quat.toRotationMatrix();
+            // pos
+            particles_[i].pos = particles_[i].pos + dt_imu * particles_[i].vec 
+                                            + 0.5 * dt_imu * dt_imu * (rot_mat * imu_acc - gravity_); 
+            // vel
+            particles_[i].vec = particles_[i].vec + dt_imu * (rot_mat * imu_acc - gravity_);
+            // quat 
+            Eigen::Quaterniond predicted_quat = quat_wdt * previous_quat;
+            particles_[i].quat = Eigen::Vector4d(predicted_quat.x(), predicted_quat.y(), predicted_quat.z(), predicted_quat.w());
+        }
+    }
+
     void ParticleFilter::update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
         double radius = 0.2;//TODO
@@ -49,8 +71,7 @@ namespace particle_filter_localization
         }
 
         int n_eff = int(1/ess_inverse); // Effective particle number
-        int num_particles = 100;//TODO
-        int n_thres = num_particles/2; 
+        int n_thres = int(particles_.size()/2); 
         if(n_eff < n_thres)
         {
             resample();

@@ -17,6 +17,7 @@ namespace particle_filter_localization
 struct Particle
 {
     Eigen::Vector3d pos;
+    Eigen::Vector3d vec;
     Eigen::Quaterniond quat;
     double weight;
 
@@ -33,7 +34,7 @@ public:
     virtual ~ParticleFilter();
 
     void init(const int num_particles, const double initial_sigma_noize, const Particle initial_particle);
-    void predict();
+    void predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc, const double dt_imu);
     void update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
     void resample();
     void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
