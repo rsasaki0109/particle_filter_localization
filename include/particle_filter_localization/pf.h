@@ -21,7 +21,7 @@ struct Particle
     Eigen::Quaterniond quat;
     double weight;
 
-    Particle() : pos(0, 0, 0),quat(1, 0, 0, 0), weight(0)
+    Particle() : pos(0, 0, 0),quat(1, 0, 0, 0)
     {
 
     }
@@ -34,12 +34,13 @@ public:
     virtual ~ParticleFilter();
 
     void init(const int num_particles, const double initial_sigma_noize, const Particle initial_particle);
-    void predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc, const double dt_imu);
+    void predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu);
     void update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
     void resample();
     void reset();
     void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
     Particle getMAPestimate();
+    std::vector<Particle> getParticles();
 
 private:
     std::vector<Particle> particles_;

@@ -37,6 +37,8 @@ namespace particle_filter_localization
         get_parameter("num_particles",num_particles_);
         declare_parameter("voxel_leaf_size",0.2);
         get_parameter("voxel_leaf_size",voxel_leaf_size_);
+        declare_parameter("var_initial_pose",0.2);
+        get_parameter("var_initial_pose",var_initial_pose_);
         declare_parameter("sigma_imu_w",0.01);
         get_parameter("sigma_imu_w",sigma_imu_w_);
         declare_parameter("sigma_imu_acc",0.01);
@@ -134,6 +136,9 @@ namespace particle_filter_localization
         std::string output_pose_name = get_name() + std::string("/current_pose");
         current_pose_pub_ = 
             create_publisher<geometry_msgs::msg::PoseStamped>(output_pose_name,10);
+        std::string output_particles_name = get_name() + std::string("/particles");
+        particles_pub_ = 
+            create_publisher<geometry_msgs::msg::PoseArray>(output_particles_name,10);
 
         // Setup Subscriber 
         auto initial_pose_callback =
@@ -149,9 +154,9 @@ namespace particle_filter_localization
             x_(STATE::QY) = current_pose_.pose.orientation.y;
             x_(STATE::QZ) = current_pose_.pose.orientation.z;
             x_(STATE::QW) = current_pose_.pose.orientation.w;
-            std::cout << "initial_x" << std::endl;
-            std::cout << x_ << std::endl;
-            std::cout << "----------------------" << std::endl;
+            //std::cout << "initial_x" << std::endl;
+            //std::cout << x_ << std::endl;
+            //std::cout << "----------------------" << std::endl;
 
             Particle initial_particle;
             initial_particle.pos.x() = current_pose_.pose.position.x;
@@ -161,8 +166,7 @@ namespace particle_filter_localization
             initial_particle.quat.y() = current_pose_.pose.orientation.y;
             initial_particle.quat.z() = current_pose_.pose.orientation.z;
             initial_particle.quat.w() = current_pose_.pose.orientation.w;
-            double initial_sigma_noize = 2.0;//TODO
-            pf_.init(num_particles_, initial_sigma_noize, initial_particle);
+            pf_.init(num_particles_, var_initial_pose_, initial_particle);
         };
 
         auto imu_callback =
@@ -207,12 +211,20 @@ namespace particle_filter_localization
                     transformed_msg.linear_acceleration.z = acc_out.vector.z; 
                     Eigen::Vector3d w(w_out.vector.x, w_out.vector.y, w_out.vector.z);
                     Eigen::Vector3d acc(acc_out.vector.x, acc_out.vector.y, acc_out.vector.z);
-                    pf_.predict(w, acc, dt_imu);      
+                       
+                    double alpha = 0.8;//a low-pass filter parameter
+                    gravity_.x() = alpha * gravity_.x() + (1 - alpha) * acc.x();
+                    gravity_.y() = alpha * gravity_.y() + (1 - alpha) * acc.y();
+                    gravity_.z() = alpha * gravity_.z() + (1 - alpha) * acc.z();
+                    Eigen::Vector3d acc_gravity_corrected = acc - gravity_;
+                    if(map_recieved_){
+                        pf_.predict(w, acc_gravity_corrected, dt_imu);   
+                    }
                 }
                 catch (tf2::TransformException& e){
                     RCLCPP_ERROR(this->get_logger(),"%s",e.what());
+                    return;
                 }
-                //predictUpdate(transformed_msg, dt_imu);
             }       
         };
 
@@ -252,6 +264,7 @@ namespace particle_filter_localization
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
             if(initial_pose_recieved_ && map_recieved_){
+                //TODO:Transformation
                 pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
                 pcl::fromROSMsg(*msg,*cloud_ptr);
                 vg_filter_.setInputCloud(cloud_ptr);
@@ -383,7 +396,7 @@ namespace particle_filter_localization
 
     void PfLocalizationComponent::measurementUpdate(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
-        //pf_.update(cloud_ptr);
+        pf_.update(cloud_ptr);
     }
 
     void PfLocalizationComponent::broadcastPose()
@@ -399,7 +412,24 @@ namespace particle_filter_localization
             current_pose_.pose.orientation.y = particle_MAP.quat.y();
             current_pose_.pose.orientation.z = particle_MAP.quat.z();
             current_pose_.pose.orientation.w = particle_MAP.quat.w();
-            current_pose_pub_->publish(current_pose_);   
+            current_pose_pub_->publish(current_pose_);  
+            
+            geometry_msgs::msg::PoseArray particles_msg;
+            std::vector<Particle> particles = pf_.getParticles();
+            particles_msg.header.stamp = current_stamp_;
+            particles_msg.header.frame_id = reference_frame_id_;
+            particles_msg.poses.resize(num_particles_);
+            for (int i = 0; i < num_particles_; i++) {
+                particles_msg.poses[i].position.x = particles[i].pos.x();
+                particles_msg.poses[i].position.y = particles[i].pos.y();
+                particles_msg.poses[i].position.z = particles[i].pos.z();
+                particles_msg.poses[i].orientation.x = particles[i].quat.x();
+                particles_msg.poses[i].orientation.y = particles[i].quat.y();
+                particles_msg.poses[i].orientation.z = particles[i].quat.z();
+                particles_msg.poses[i].orientation.w = particles[i].quat.w();
+            }
+            particles_pub_->publish(particles_msg);
+
         }
         return;
     }

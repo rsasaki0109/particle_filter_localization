@@ -4,6 +4,7 @@ pf_localization:
       robot_frame_id: "base_link"
       imu_topic: "imu/data"
       pub_period: 10
+      var_initial_pose: 0.2
       sigma_imu_w: 0.01
       sigma_imu_acc: 0.01
       num_particles: 100

@@ -134,6 +134,22 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Alpha: 1
+      Arrow Length: 0.30000001192092896
+      Axes Length: 0.30000001192092896
+      Axes Radius: 0.009999999776482582
+      Class: rviz_default_plugins/PoseArray
+      Color: 0; 25; 255
+      Enabled: true
+      Head Length: 0.07000000029802322
+      Head Radius: 0.029999999329447746
+      Name: PoseArray
+      Shaft Length: 0.23000000417232513
+      Shaft Radius: 0.009999999776482582
+      Shape: Arrow (Flat)
+      Topic: /pf_localization/particles
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -160,7 +176,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 14.199628829956055
+      Distance: 13.37582778930664
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -175,10 +191,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.305398166179657
+      Pitch: 0.3653984069824219
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.635467529296875
+      Yaw: 5.645444869995117
     Saved: ~
 Window Geometry:
   Displays:
@@ -194,5 +210,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1078
-  X: 389
-  Y: 298
+  X: 358
+  Y: 171

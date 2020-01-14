@@ -35,24 +35,27 @@ namespace particle_filter_localization
         }
     }
 
-    void ParticleFilter::predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc, const double dt_imu)
+    void ParticleFilter::predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu)
     {
         int num_particles = particles_.size();
-
-        Eigen::Vector3d gravity_;
-        gravity_ << 0,0,-9.80665;//TODO?
-
-        Eigen::Quaterniond quat_wdt =  Eigen::Quaterniond(Eigen::AngleAxisd(imu_w.x() * dt_imu, Eigen::Vector3d::UnitX()) 
-                                            * Eigen::AngleAxisd(imu_w.y() * dt_imu, Eigen::Vector3d::UnitY())    
-                                            * Eigen::AngleAxisd(imu_w.z() * dt_imu, Eigen::Vector3d::UnitZ()));  
+        std::normal_distribution<double> addnoize_w(0, 0.1);
+        std::normal_distribution<double> addnoize_acc(0, 0.1);
+        
         for (int i = 0; i< num_particles; i++){ 
+            Eigen::Vector3d w_noize(addnoize_w(random_seed_), addnoize_w(random_seed_), addnoize_w(random_seed_));
+            Eigen::Vector3d acc_noize(addnoize_acc(random_seed_), addnoize_acc(random_seed_), addnoize_acc(random_seed_));
+            Eigen::Vector3d imu_w_particle = imu_w + w_noize;
+            Eigen::Vector3d imu_acc_particle = imu_acc_gravity_corrected + acc_noize;
+            Eigen::Quaterniond quat_wdt =  Eigen::Quaterniond(Eigen::AngleAxisd(imu_w_particle.x() * dt_imu, Eigen::Vector3d::UnitX()) 
+                                            * Eigen::AngleAxisd(imu_w_particle.y() * dt_imu, Eigen::Vector3d::UnitY())    
+                                            * Eigen::AngleAxisd(imu_w_particle.z() * dt_imu, Eigen::Vector3d::UnitZ()));  
             Eigen::Quaterniond previous_quat = Eigen::Quaterniond(particles_[i].quat.w(), particles_[i].quat.x(), particles_[i].quat.y(), particles_[i].quat.z());
             Eigen::Matrix3d rot_mat = previous_quat.toRotationMatrix();
             // pos
             particles_[i].pos = particles_[i].pos + dt_imu * particles_[i].vec 
-                                            + 0.5 * dt_imu * dt_imu * (rot_mat * imu_acc - gravity_); 
+                                            + 0.5 * dt_imu * dt_imu * rot_mat * imu_acc_particle; 
             // vel
-            particles_[i].vec = particles_[i].vec + dt_imu * (rot_mat * imu_acc - gravity_);
+            particles_[i].vec = particles_[i].vec + dt_imu * rot_mat * imu_acc_particle;
             // quat 
             Eigen::Quaterniond predicted_quat = quat_wdt * previous_quat;
             particles_[i].quat = Eigen::Vector4d(predicted_quat.x(), predicted_quat.y(), predicted_quat.z(), predicted_quat.w());
@@ -61,27 +64,39 @@ namespace particle_filter_localization
 
     void ParticleFilter::update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
-        std::cout << "start search" << std::endl;
-        
+        //TODO:Likelihood function
         double sum_weight = 0;
         int num_particles = particles_.size();
         for (int i = 0; i< num_particles; i++){
+            //std::cout << "a" << std::endl;
+            //std::cout << particles_[i].weight << std::endl;
             Eigen::Matrix4f transform = (Eigen::Isometry3d(Eigen::Translation3d(particles_[i].pos.x(), particles_[i].pos.y(), particles_[i].pos.z())
 			                      * Eigen::Quaterniond(particles_[i].quat.w(), particles_[i].quat.x(), particles_[i].quat.y(), particles_[i].quat.z()))).matrix().cast<float>();
+            //std::cout << transform << std::endl;
             pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
             pcl::transformPointCloud(*cloud_ptr, *transformed_cloud_ptr, transform);
             int num_clouds = cloud_ptr->points.size();
+            double log_p = 0;
             for (int j = 0; j < num_clouds; j++){
                 std::vector<int> pointIndices;
                 std::vector<float> pointDistances;
-                if(kdtree_.radiusSearch(cloud_ptr->points[j], kdtree_radius_, pointIndices, pointDistances, 1) ==0){
+                int num_searched = kdtree_.radiusSearch(transformed_cloud_ptr->points[j], kdtree_radius_, pointIndices, pointDistances, 1);
+                if(num_searched ==0){
+                    log_p -= kdtree_radius_/10;
                     continue;//dist_max?
                 }
                 double dist = double(pointDistances[0]);
-                double sigma_lidar = 0.02;
-                double p = 1.0 / sqrt(2.0 * M_PI * sigma_lidar * sigma_lidar) * exp(-dist * dist / (2 * sigma_lidar * sigma_lidar));
-                particles_[i].weight = particles_[i].weight * p;//addition better than multiplication?
+                //std::cout << dist << std::endl;
+                //double sigma_lidar = 0.02;
+                //double p = 1.0 / sqrt(2.0 * M_PI * sigma_lidar * sigma_lidar) * exp(-dist * dist / (2 * sigma_lidar * sigma_lidar));
+                //double weight_one_point = 0.7;
+                //std::cout << num_searched << std::endl;
+                //std::cout << p * weight_one_point << std::endl;
+                //particles_[i].weight = particles_[i].weight * p * weight_one_point;//addition better than multiplication?
+                log_p += dist;
             }
+            particles_[i].weight = exp(log_p);
+            //std::cout << particles_[i].weight << std::endl;//aaaaaaaaa
             sum_weight += particles_[i].weight;
             if(max_weight_ < particles_[i].weight)
             {
@@ -89,7 +104,6 @@ namespace particle_filter_localization
                 ind_MAP_ = i;
             }
         }
-        std::cout << "end search" << std::endl;
 
         double ess_inverse = 0;
         for (int i = 0; i< num_particles; i++){
@@ -154,6 +168,11 @@ namespace particle_filter_localization
     Particle ParticleFilter::getMAPestimate()
     {
         return particles_[ind_MAP_];
+    }
+
+    std::vector<Particle> ParticleFilter::getParticles()
+    {
+        return particles_;
     }
 
 } // namespace particle_filter_localization

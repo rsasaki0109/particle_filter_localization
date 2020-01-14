@@ -41,6 +41,7 @@ extern "C" {
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
 #include <geometry_msgs/msg/transform.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/vector3_stamped.hpp>
@@ -93,6 +94,7 @@ namespace particle_filter_localization
         int num_obs_;
         int num_particles_;
         double voxel_leaf_size_;
+        double var_initial_pose_;
         double sigma_imu_w_;
         double sigma_imu_acc_;
         double sigma_gnss_xy_;
@@ -125,6 +127,8 @@ namespace particle_filter_localization
         rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_cloud_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_gnss_pose_;
         rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_pub_;
+        rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr particles_pub_;
+
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::Clock clock_;
         tf2_ros::Buffer tfbuffer_;

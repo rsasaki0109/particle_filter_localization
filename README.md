@@ -10,13 +10,15 @@ pf_localization_node
 /imu  (sensor_msgs/Imu)  
 /tf 
 - output  
-/curent_pose (geometry_msgs/PoseStamped)
+/curent_pose (geometry_msgs/PoseStamped)  
+/particles (geometry_msgs/PoseArray)
 
 ## params
 
 |Name|Type|Default value|Description|
 |---|---|---|---|
 |pub_period|int|10|publish period[ms]|
+|var_initial_pose|double|0.2|variance of an initial_pose[m^2]|
 |var_imu_w|double|0.01|variance of an angular velocity sensor[(deg/sec)^2]|
 |var_imu_acc|double|0.01|variance of an accelerometer[(m/sec^2)^2]|
 |num_particles|int|100|numbers of particels|
