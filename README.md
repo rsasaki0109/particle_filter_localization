@@ -7,7 +7,7 @@ pf_localization_node
 /initial_pose  (geometry_msgs/PoseStamed)  
 /cloud  (sensor_msgs/PointCloud2)  
 /map  (sensor_msgs/PointCloud2)  
-/imu  (sensor_msgs/Imu) 
+/imu  (sensor_msgs/Imu)  
 /tf 
 - output  
 /curent_pose (geometry_msgs/PoseStamped)
