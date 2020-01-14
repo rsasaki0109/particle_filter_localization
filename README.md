@@ -1,5 +1,5 @@
 # Particle Filter Localization  
-Particle Filter Localization  is a ros2 package of Particle Filter Based Localization in 3D using GNSS/IMU/Odometry(Visual Odometry/Lidar Odometry).
+Particle Filter Localization  is a ros2 package of Particle Filter Based Localization in 3D using LiDAR/IMU.
 
 ## node
 pf_localization_node
@@ -8,8 +8,7 @@ pf_localization_node
 /cloud  (sensor_msgs/PointCloud2)  
 /map  (sensor_msgs/PointCloud2)  
 /imu  (sensor_msgs/Imu) 
-/odom (nav_msgs/Odometry)  
-/tf(/base_link(robot frame) → /imu_link(imu frame))   
+/tf 
 - output  
 /curent_pose (geometry_msgs/PoseStamped)
 
@@ -18,13 +17,8 @@ pf_localization_node
 |Name|Type|Default value|Description|
 |---|---|---|---|
 |pub_period|int|10|publish period[ms]|
-|sigma_gnss_xy|double|0.1|variance of a gnss receiver about position xy[m^2]|
-|sigma_gnss_z|double|0.15|variance of a gnss receiver about position z[m^2]|
-|sigma_odom_xyz|double|0.1|variance of an odometry[m^2]|
-|sigma_imu_w|double|0.01|variance of an angular velocity sensor[(deg/sec)^2]|
-|sigma_imu_acc|double|0.01|variance of an accelerometer[(m/sec^2)^2]|
-|use_gnss|bool|true|whether gnss is used or not |
-|use_odom|bool|false|whether odom(lo/vo) is used or not |
+|num_particles|int|100|numbers of particels|
+|voxel_leaf_size|double|0.2|a down sample size of a input cloud[m]|
 
 ## demo
 

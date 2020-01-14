@@ -26,11 +26,11 @@ def generate_launch_description():
         output='screen'
         )
     
-    tf = launch_ros.actions.Node(
-        package='tf2_ros',
-        node_executable='static_transform_publisher',
-        arguments=['0','0','0','0','0','0','1','base_link','imu_link']
-        )
+    #tf = launch_ros.actions.Node(
+    #    package='tf2_ros',
+    #    node_executable='static_transform_publisher',
+    #    arguments=['0','0','0','0','0','0','1','base_link','imu_link']
+    #    )
 
     return launch.LaunchDescription([
         launch.actions.DeclareLaunchArgument(
@@ -38,5 +38,5 @@ def generate_launch_description():
             default_value=pf_param_dir,
             description='Full path to pf parameter file to load'),
         pf,
-        tf,
+        #tf,
             ])

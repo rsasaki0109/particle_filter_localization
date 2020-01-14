@@ -3,7 +3,7 @@ pf_localization:
       reference_frame_id: "map"
       robot_frame_id: "base_link"
       gnss_pose_topic: "gnss_pose"
-      imu_topic: "imu"
+      imu_topic: "imu/data"
       odom_topic: "odom"
       pub_period: 10
       sigma_imu_w: 0.01

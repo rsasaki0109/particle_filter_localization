@@ -39,9 +39,12 @@ public:
     void resample();
     void reset();
     void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
+    Particle getMAPestimate();
 
 private:
     std::vector<Particle> particles_;
+    int ind_MAP_;
+    double max_weight_;
 
     pcl::KdTreeFLANN<pcl::PointXYZI> kdtree_;
 

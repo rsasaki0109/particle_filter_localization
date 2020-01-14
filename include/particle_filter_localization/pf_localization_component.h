@@ -67,6 +67,7 @@ extern "C" {
 #include <Eigen/Core>
 
 #include <pcl/point_types.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include <particle_filter_localization/pf.h>
 
@@ -91,6 +92,7 @@ namespace particle_filter_localization
         int num_error_state_;
         int num_obs_;
         int num_particles_;
+        double voxel_leaf_size_;
         double sigma_imu_w_;
         double sigma_imu_acc_;
         double sigma_gnss_xy_;
@@ -114,6 +116,7 @@ namespace particle_filter_localization
         pcl::KdTreeFLANN<pcl::PointXYZI> kdtree_;
         pcl::PointCloud<pcl::PointXYZI> map_;
         
+        pcl::VoxelGrid<pcl::PointXYZI> vg_filter_;
         Eigen::Vector3d gravity_;
         rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_initial_pose_;
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_imu_;
@@ -126,7 +129,7 @@ namespace particle_filter_localization
         rclcpp::Clock clock_;
         tf2_ros::Buffer tfbuffer_;
         tf2_ros::TransformListener listener_;
-        void predictUpdate(const sensor_msgs::msg::Imu input_imu_msg);
+        void predictUpdate(const sensor_msgs::msg::Imu input_imu_msg, const double dt_imu);
         void measurementUpdate(const geometry_msgs::msg::PoseStamped input_pose_msg, const double variance[]);
         void measurementUpdate(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
         void broadcastPose();

@@ -35,6 +35,8 @@ namespace particle_filter_localization
         get_parameter("num_error_state",num_error_state_);
         declare_parameter("num_particles",100);
         get_parameter("num_particles",num_particles_);
+        declare_parameter("voxel_leaf_size",0.2);
+        get_parameter("voxel_leaf_size",voxel_leaf_size_);
         declare_parameter("sigma_imu_w",0.01);
         get_parameter("sigma_imu_w",sigma_imu_w_);
         declare_parameter("sigma_imu_acc",0.01);
@@ -116,6 +118,7 @@ namespace particle_filter_localization
         x_(STATE::QW) = 1;
         P_ = Eigen::MatrixXd::Identity(num_error_state_,num_error_state_) * 100;//todo:set initial value properly
         gravity_ << 0,0,-9.80665;
+        vg_filter_.setLeafSize(voxel_leaf_size_, voxel_leaf_size_, voxel_leaf_size_);  
 
         sigma_gnss_[0] = sigma_gnss_xy_;
         sigma_gnss_[1] = sigma_gnss_xy_;
@@ -165,6 +168,18 @@ namespace particle_filter_localization
         auto imu_callback =
         [this](const typename sensor_msgs::msg::Imu::SharedPtr msg) -> void
         {
+            current_stamp_ = msg->header.stamp;
+
+            // dt_imu
+            double current_time_imu = msg->header.stamp.sec 
+                                      + msg->header.stamp.nanosec * 1e-9;
+            if(previous_time_imu_ == -1){
+                previous_time_imu_ = current_time_imu;
+                return;
+            }
+            double dt_imu = current_time_imu - previous_time_imu_;
+            previous_time_imu_ = current_time_imu;
+
             if(initial_pose_recieved_){
                 sensor_msgs::msg::Imu transformed_msg;
                 try
@@ -189,12 +204,15 @@ namespace particle_filter_localization
                     transformed_msg.angular_velocity.z = w_out.vector.z;
                     transformed_msg.linear_acceleration.x = acc_out.vector.x;
                     transformed_msg.linear_acceleration.y = acc_out.vector.y;
-                    transformed_msg.linear_acceleration.z = acc_out.vector.z;       
+                    transformed_msg.linear_acceleration.z = acc_out.vector.z; 
+                    Eigen::Vector3d w(w_out.vector.x, w_out.vector.y, w_out.vector.z);
+                    Eigen::Vector3d acc(acc_out.vector.x, acc_out.vector.y, acc_out.vector.z);
+                    pf_.predict(w, acc, dt_imu);      
                 }
                 catch (tf2::TransformException& e){
                     RCLCPP_ERROR(this->get_logger(),"%s",e.what());
                 }
-                predictUpdate(transformed_msg);
+                //predictUpdate(transformed_msg, dt_imu);
             }       
         };
 
@@ -223,7 +241,6 @@ namespace particle_filter_localization
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
             std::cout << "map callback" << std::endl;
-            //pcl::PointCloud<pcl::PointXYZI>::Ptr map_(new pcl::PointCloud<pcl::PointXYZI>);
             pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr(new pcl::PointCloud<pcl::PointXYZI>());
             map_recieved_ = true;
             pcl::fromROSMsg(*msg,*map_ptr);
@@ -237,7 +254,10 @@ namespace particle_filter_localization
             if(initial_pose_recieved_ && map_recieved_){
                 pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
                 pcl::fromROSMsg(*msg,*cloud_ptr);
-                measurementUpdate(cloud_ptr);
+                vg_filter_.setInputCloud(cloud_ptr);
+                pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+                vg_filter_.filter(*filtered_cloud_ptr);
+                measurementUpdate(filtered_cloud_ptr);
             }
         };
 
@@ -276,19 +296,9 @@ namespace particle_filter_localization
      * covariance
      * P_{k} = F_k P_{k-1} F_k^T + L Q_k L^T
      */
-    void PfLocalizationComponent::predictUpdate(const sensor_msgs::msg::Imu input_imu_msg)
+    void PfLocalizationComponent::predictUpdate(const sensor_msgs::msg::Imu input_imu_msg, const double dt_imu)
     {
-        current_stamp_ = input_imu_msg.header.stamp;
-
-        // dt_imu
-        double current_time_imu = input_imu_msg.header.stamp.sec 
-                                    + input_imu_msg.header.stamp.nanosec * 1e-9;
-        if(previous_time_imu_ == -1){
-            previous_time_imu_ = current_time_imu;
-            return;
-        }
-        double dt_imu = current_time_imu - previous_time_imu_;
-        previous_time_imu_ = current_time_imu;
+        
         
         // state
         Eigen::Quaterniond previous_quat = Eigen::Quaterniond(x_(STATE::QW), x_(STATE::QX), x_(STATE::QY), x_(STATE::QZ));
@@ -373,21 +383,22 @@ namespace particle_filter_localization
 
     void PfLocalizationComponent::measurementUpdate(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
-        pf_.update(cloud_ptr);
+        //pf_.update(cloud_ptr);
     }
 
     void PfLocalizationComponent::broadcastPose()
     {
         if(initial_pose_recieved_){
+            Particle particle_MAP = pf_.getMAPestimate();
             current_pose_.header.stamp = current_stamp_;
             current_pose_.header.frame_id = reference_frame_id_;
-            current_pose_.pose.position.x = x_(STATE::X);
-            current_pose_.pose.position.y = x_(STATE::Y);
-            current_pose_.pose.position.z = x_(STATE::Z);
-            current_pose_.pose.orientation.x = x_(STATE::QX);
-            current_pose_.pose.orientation.y = x_(STATE::QY);
-            current_pose_.pose.orientation.z = x_(STATE::QZ);
-            current_pose_.pose.orientation.w = x_(STATE::QW);
+            current_pose_.pose.position.x = particle_MAP.pos.x();
+            current_pose_.pose.position.y = particle_MAP.pos.y();
+            current_pose_.pose.position.z = particle_MAP.pos.z();
+            current_pose_.pose.orientation.x = particle_MAP.quat.x();
+            current_pose_.pose.orientation.y = particle_MAP.quat.y();
+            current_pose_.pose.orientation.z = particle_MAP.quat.z();
+            current_pose_.pose.orientation.w = particle_MAP.quat.w();
             current_pose_pub_->publish(current_pose_);   
         }
         return;
