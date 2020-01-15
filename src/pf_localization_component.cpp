@@ -264,9 +264,21 @@ namespace particle_filter_localization
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
             if(initial_pose_recieved_ && map_recieved_){
-                //TODO:Transformation
+                sensor_msgs::msg::PointCloud2 transformerd_msg;
+                try{
+                    tf2::TimePoint time_point = tf2::TimePoint(
+                        std::chrono::seconds(msg->header.stamp.sec) +
+                        std::chrono::nanoseconds(msg->header.stamp.nanosec));
+                    const geometry_msgs::msg::TransformStamped transform = tfbuffer_.lookupTransform(
+                        robot_frame_id_, msg->header.frame_id, time_point);
+                    tf2::doTransform(*msg, transformerd_msg, transform);//TODO:slow(https://github.com/ros/geometry2/pull/432)
+                }
+                catch (tf2::TransformException& e){
+                    RCLCPP_ERROR(this->get_logger(),"%s",e.what());
+                    return;
+                }
                 pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
-                pcl::fromROSMsg(*msg,*cloud_ptr);
+                pcl::fromROSMsg(transformerd_msg,*cloud_ptr);
                 vg_filter_.setInputCloud(cloud_ptr);
                 pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
                 vg_filter_.filter(*filtered_cloud_ptr);
