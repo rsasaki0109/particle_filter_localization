@@ -35,6 +35,8 @@ namespace particle_filter_localization
         get_parameter("num_error_state",num_error_state_);
         declare_parameter("num_particles",100);
         get_parameter("num_particles",num_particles_);
+        declare_parameter("selected_estimator","WeightedAverage");
+        get_parameter("selected_estimator",selected_estimator_);
         declare_parameter("voxel_leaf_size",0.2);
         get_parameter("voxel_leaf_size",voxel_leaf_size_);
         declare_parameter("var_initial_pose",0.2);
@@ -414,16 +416,22 @@ namespace particle_filter_localization
     void PfLocalizationComponent::broadcastPose()
     {
         if(initial_pose_recieved_){
-            Particle particle_MAP = pf_.getMAPestimate();
+            Particle selected_posatt; 
+            if(selected_estimator_ == "WeightedAverage"){
+                selected_posatt = pf_.getWeightAverage();
+            }
+            else{
+                selected_posatt = pf_.getMAPestimate();
+            }
             current_pose_.header.stamp = current_stamp_;
             current_pose_.header.frame_id = reference_frame_id_;
-            current_pose_.pose.position.x = particle_MAP.pos.x();
-            current_pose_.pose.position.y = particle_MAP.pos.y();
-            current_pose_.pose.position.z = particle_MAP.pos.z();
-            current_pose_.pose.orientation.x = particle_MAP.quat.x();
-            current_pose_.pose.orientation.y = particle_MAP.quat.y();
-            current_pose_.pose.orientation.z = particle_MAP.quat.z();
-            current_pose_.pose.orientation.w = particle_MAP.quat.w();
+            current_pose_.pose.position.x = selected_posatt.pos.x();
+            current_pose_.pose.position.y = selected_posatt.pos.y();
+            current_pose_.pose.position.z = selected_posatt.pos.z();
+            current_pose_.pose.orientation.x = selected_posatt.quat.x();
+            current_pose_.pose.orientation.y = selected_posatt.quat.y();
+            current_pose_.pose.orientation.z = selected_posatt.quat.z();
+            current_pose_.pose.orientation.w = selected_posatt.quat.w();
             current_pose_pub_->publish(current_pose_);  
             
             geometry_msgs::msg::PoseArray particles_msg;

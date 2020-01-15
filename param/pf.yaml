@@ -8,4 +8,5 @@ pf_localization:
       sigma_imu_w: 0.01
       sigma_imu_acc: 0.01
       num_particles: 100
+      selected_estimator: "WeightedAverage"
       voxel_leaf_size: 0.2

@@ -40,6 +40,7 @@ public:
     void reset();
     void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
     Particle getMAPestimate();
+    Particle getWeightAverage();
     std::vector<Particle> getParticles();
 
 private:

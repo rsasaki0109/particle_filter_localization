@@ -93,6 +93,7 @@ namespace particle_filter_localization
         int num_error_state_;
         int num_obs_;
         int num_particles_;
+        std::string selected_estimator_;
         double voxel_leaf_size_;
         double var_initial_pose_;
         double sigma_imu_w_;

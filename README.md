@@ -22,6 +22,7 @@ pf_localization_node
 |var_imu_w|double|0.01|variance of an angular velocity sensor[(deg/sec)^2]|
 |var_imu_acc|double|0.01|variance of an accelerometer[(m/sec^2)^2]|
 |num_particles|int|100|numbers of particels|
+|selected_estimator|std::string|"WeightedAverage"|"MAP" or "WeightedAverage"|
 |voxel_leaf_size|double|0.2|a down sample size of a input cloud[m]|
 
 ## demo

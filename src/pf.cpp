@@ -38,8 +38,8 @@ namespace particle_filter_localization
     void ParticleFilter::predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu)
     {
         int num_particles = particles_.size();
-        std::normal_distribution<double> addnoize_w(0, 0.1);
-        std::normal_distribution<double> addnoize_acc(0, 0.1);
+        std::normal_distribution<double> addnoize_w(0, 0.2);
+        std::normal_distribution<double> addnoize_acc(0, 0.2);
         
         for (int i = 0; i< num_particles; i++){ 
             Eigen::Vector3d w_noize(addnoize_w(random_seed_), addnoize_w(random_seed_), addnoize_w(random_seed_));
@@ -78,11 +78,13 @@ namespace particle_filter_localization
             int num_clouds = cloud_ptr->points.size();
             double log_p = 0;
             for (int j = 0; j < num_clouds; j++){
+                //double sigma_lidar = 0.2;
                 std::vector<int> pointIndices;
                 std::vector<float> pointDistances;
                 int num_searched = kdtree_.radiusSearch(transformed_cloud_ptr->points[j], kdtree_radius_, pointIndices, pointDistances, 1);
                 if(num_searched ==0){
-                    log_p -= kdtree_radius_/10;
+                    log_p -= sqrt(kdtree_radius_)/10;///10;
+                    //log_p -= 1.0 * (log(sqrt(M_PI))) - log(sigma_lidar) - ((kdtree_radius_ * kdtree_radius_)/(2* sigma_lidar * sigma_lidar));
                     continue;//dist_max?
                 }
                 double dist = double(pointDistances[0]);
@@ -93,9 +95,11 @@ namespace particle_filter_localization
                 //std::cout << num_searched << std::endl;
                 //std::cout << p * weight_one_point << std::endl;
                 //particles_[i].weight = particles_[i].weight * p * weight_one_point;//addition better than multiplication?
-                log_p += dist;
+                log_p -= sqrt(dist)/10;
+                //log_p -= 1.0 * (log(sqrt(M_PI))) - log(sigma_lidar) - ((dist * dist)/(2* sigma_lidar * sigma_lidar));
             }
             particles_[i].weight = exp(log_p);
+            //std::cout << log_p << std::endl;
             //std::cout << particles_[i].weight << std::endl;//aaaaaaaaa
             sum_weight += particles_[i].weight;
             if(max_weight_ < particles_[i].weight)
@@ -113,8 +117,11 @@ namespace particle_filter_localization
 
         int n_eff = int(1/ess_inverse); // Effective particle number
         int n_thres = int(num_particles/2); 
+        //std::cout << "n_eff" << std::endl;
+        //std::cout << n_eff << std::endl;
         if(n_eff < n_thres)
         {
+            //std::cout << "resample" << std::endl;
             resample();
         }
     }
@@ -168,6 +175,29 @@ namespace particle_filter_localization
     Particle ParticleFilter::getMAPestimate()
     {
         return particles_[ind_MAP_];
+    }
+    Particle ParticleFilter::getWeightAverage()
+    {
+        Eigen::Vector3d pos_sum = Eigen::Vector3d::Zero();
+        Eigen::Vector3d vec_sum = Eigen::Vector3d::Zero();
+        Eigen::Matrix4d mat_sum = Eigen::Matrix4d::Zero();
+        for (auto p:particles_){
+            // pos and vec
+            pos_sum += p.pos;
+            vec_sum += p.vec;
+            // quat
+            Eigen::Vector4d quat_vec = Eigen::Vector4d(p.quat.w(), p.quat.x(), p.quat.y(), p.quat.z());
+            mat_sum += quat_vec * quat_vec.transpose();
+        }
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(mat_sum);
+        Eigen::Vector4d eig_vec_max = solver.eigenvectors().col(solver.eigenvectors().row(0).size() - 1);
+        Eigen::Quaterniond quat_ave(eig_vec_max(0), eig_vec_max(1), eig_vec_max(2), eig_vec_max(3));
+
+        Particle average_partice;
+        average_partice.pos = pos_sum/particles_.size();
+        average_partice.vec = vec_sum/particles_.size();
+        average_partice.quat = quat_ave;
+        return average_partice;
     }
 
     std::vector<Particle> ParticleFilter::getParticles()
