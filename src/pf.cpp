@@ -5,7 +5,6 @@ namespace particle_filter_localization
 
     ParticleFilter::ParticleFilter(){
         ind_MAP_ = 0;
-        max_weight_ = 0;
     }
     ParticleFilter::~ParticleFilter(){}
 
@@ -31,15 +30,30 @@ namespace particle_filter_localization
             particles_[i].quat.y() = initial_particle.quat.y();
             particles_[i].quat.z() = initial_particle.quat.z();
             particles_[i].quat.w() = initial_particle.quat.w();
+            particles_[i].cov = Eigen::Matrix<double,9,9>::Zero();
             particles_[i].weight = 1/double(num_particles);
         }
     }
 
+    //TODO:like a Fast SLAM(estimaterのみでKFしてGaussian PFのように粒子をまき直したほうが効率良さそう？)
+    /* state
+     * x  = [p v q] = [x y z vx vy vz qx qy qz qw]
+     * dx = [dp dv dth] = [dx dy dz dvx dvy dvz dthx dthy dthz]
+     * 
+     * pos_k = pos_{k-1} + vel_k * dt + (1/2) * (Rot(q_{k-1}) acc_{k-1}^{imu} - g) *dt^2
+     * vel_k = vel_{k-1} + (Rot(quat_{k-1})) acc_{k-1}^{imu} - g) *dt
+     * quat_k = Rot(w_{k-1}^{imu}*dt)*quat_{k-1}
+     * 
+     * covariance
+     * P_{k} = F_k P_{k-1} F_k^T + L Q_k L^T
+     */
     void ParticleFilter::predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu)
     {
         int num_particles = particles_.size();
-        std::normal_distribution<double> addnoize_w(0, 0.2);
-        std::normal_distribution<double> addnoize_acc(0, 0.2);
+        double sigma_imu_w_ = 0.2;
+        double sigma_imu_acc_ = 0.2;
+        std::normal_distribution<double> addnoize_w(0, sigma_imu_w_);
+        std::normal_distribution<double> addnoize_acc(0, sigma_imu_acc_);
         
         for (int i = 0; i< num_particles; i++){ 
             Eigen::Vector3d w_noize(addnoize_w(random_seed_), addnoize_w(random_seed_), addnoize_w(random_seed_));
@@ -59,13 +73,36 @@ namespace particle_filter_localization
             // quat 
             Eigen::Quaterniond predicted_quat = quat_wdt * previous_quat;
             particles_[i].quat = Eigen::Vector4d(predicted_quat.x(), predicted_quat.y(), predicted_quat.z(), predicted_quat.w());
+
+            // cov
+            // F
+            Eigen::Matrix<double,9,9> F = Eigen::MatrixXd::Identity(9,9);
+            F.block<3,3>(0,3) = dt_imu *  Eigen::MatrixXd::Identity(3,3);
+            Eigen::Vector3d acc = imu_acc_particle;
+            Eigen::Matrix3d acc_skew ;
+            acc_skew << 0      ,-acc(2), acc(1),
+                        acc(2) ,0      ,-acc(0),
+                        -acc(1),acc(0) ,0;
+            F.block<3,3>(3,6) = rot_mat *(-acc_skew) * dt_imu;
+            // Q
+            Eigen::MatrixXd Q = Eigen::MatrixXd::Identity(6,6);
+            Q.block<3,3>(0, 0) = sigma_imu_acc_ * Q.block<3,3>(0, 0);
+            Q.block<3,3>(3, 3) = sigma_imu_w_ * Q.block<3,3>(3, 3);
+            Q = Q * (dt_imu * dt_imu);
+            // L
+            Eigen::MatrixXd L = Eigen::MatrixXd::Zero(9,6);
+            L.block<3,3>(3, 0) = Eigen::MatrixXd::Identity(3,3);
+            L.block<3,3>(6, 3) = Eigen::MatrixXd::Identity(3,3);
+            particles_[i].cov = F * particles_[i].cov * F.transpose() + L * Q * L.transpose();
+
         }
     }
 
     void ParticleFilter::update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
-        //TODO:Likelihood function
+        //TODO:Likelihood function!!!!!!!
         double sum_weight = 0;
+        double max_weight = 0;
         int num_particles = particles_.size();
         for (int i = 0; i< num_particles; i++){
             //std::cout << "a" << std::endl;
@@ -92,7 +129,6 @@ namespace particle_filter_localization
                 //double sigma_lidar = 0.02;
                 //double p = 1.0 / sqrt(2.0 * M_PI * sigma_lidar * sigma_lidar) * exp(-dist * dist / (2 * sigma_lidar * sigma_lidar));
                 //double weight_one_point = 0.7;
-                //std::cout << num_searched << std::endl;
                 //std::cout << p * weight_one_point << std::endl;
                 //particles_[i].weight = particles_[i].weight * p * weight_one_point;//addition better than multiplication?
                 log_p -= sqrt(dist)/10;
@@ -102,9 +138,9 @@ namespace particle_filter_localization
             //std::cout << log_p << std::endl;
             //std::cout << particles_[i].weight << std::endl;//aaaaaaaaa
             sum_weight += particles_[i].weight;
-            if(max_weight_ < particles_[i].weight)
+            if(max_weight < particles_[i].weight)
             {
-                max_weight_ = particles_[i].weight;
+                max_weight = particles_[i].weight;
                 ind_MAP_ = i;
             }
         }
@@ -128,7 +164,7 @@ namespace particle_filter_localization
 
     //reference:cpprobotics particlefilter(MIT LICENSE)
     //https://github.com/onlytailei/CppRobotics/blob/master/src/particle_filter.cpp#L120
-    //TODO: change KLD-sampling
+    //TODO: change KLD-sampling?
     void ParticleFilter::resample()
     {
         int num_particles = particles_.size();
@@ -156,7 +192,6 @@ namespace particle_filter_localization
         }
 
         int ind = 0;
-
         for(int i=0; i<num_particles; i++){
             while(resampleid(i) > wcum(ind) && ind<num_particles-1){
              ind += 1;
@@ -176,7 +211,7 @@ namespace particle_filter_localization
     {
         return particles_[ind_MAP_];
     }
-    Particle ParticleFilter::getWeightAverage()
+    Particle ParticleFilter::getWeightedAverage()
     {
         Eigen::Vector3d pos_sum = Eigen::Vector3d::Zero();
         Eigen::Vector3d vec_sum = Eigen::Vector3d::Zero();
@@ -189,15 +224,15 @@ namespace particle_filter_localization
             Eigen::Vector4d quat_vec = Eigen::Vector4d(p.quat.w(), p.quat.x(), p.quat.y(), p.quat.z());
             mat_sum += quat_vec * quat_vec.transpose();
         }
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(mat_sum);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix4d> solver(mat_sum);
         Eigen::Vector4d eig_vec_max = solver.eigenvectors().col(solver.eigenvectors().row(0).size() - 1);
         Eigen::Quaterniond quat_ave(eig_vec_max(0), eig_vec_max(1), eig_vec_max(2), eig_vec_max(3));
 
-        Particle average_partice;
-        average_partice.pos = pos_sum/particles_.size();
-        average_partice.vec = vec_sum/particles_.size();
-        average_partice.quat = quat_ave;
-        return average_partice;
+        Particle average_particle;
+        average_particle.pos = pos_sum/particles_.size();
+        average_particle.vec = vec_sum/particles_.size();
+        average_particle.quat = quat_ave;
+        return average_particle;
     }
 
     std::vector<Particle> ParticleFilter::getParticles()

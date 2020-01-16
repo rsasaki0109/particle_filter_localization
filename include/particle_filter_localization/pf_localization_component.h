@@ -134,7 +134,6 @@ namespace particle_filter_localization
         rclcpp::Clock clock_;
         tf2_ros::Buffer tfbuffer_;
         tf2_ros::TransformListener listener_;
-        void predictUpdate(const sensor_msgs::msg::Imu input_imu_msg, const double dt_imu);
         void measurementUpdate(const geometry_msgs::msg::PoseStamped input_pose_msg, const double variance[]);
         void measurementUpdate(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
         void broadcastPose();

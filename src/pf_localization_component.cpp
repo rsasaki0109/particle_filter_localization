@@ -149,17 +149,6 @@ namespace particle_filter_localization
             std::cout << "initial pose callback" << std::endl;
             initial_pose_recieved_ = true;
             current_pose_ = *msg;
-            x_(STATE::X) = current_pose_.pose.position.x;
-            x_(STATE::Y) = current_pose_.pose.position.y;
-            x_(STATE::Z) = current_pose_.pose.position.z;
-            x_(STATE::QX) = current_pose_.pose.orientation.x;
-            x_(STATE::QY) = current_pose_.pose.orientation.y;
-            x_(STATE::QZ) = current_pose_.pose.orientation.z;
-            x_(STATE::QW) = current_pose_.pose.orientation.w;
-            //std::cout << "initial_x" << std::endl;
-            //std::cout << x_ << std::endl;
-            //std::cout << "----------------------" << std::endl;
-
             Particle initial_particle;
             initial_particle.pos.x() = current_pose_.pose.position.x;
             initial_particle.pos.y() = current_pose_.pose.position.y;
@@ -312,62 +301,7 @@ namespace particle_filter_localization
                 std::bind(&PfLocalizationComponent::broadcastPose, this));
     }   
 
-    /* state
-     * x  = [p v q] = [x y z vx vy vz qx qy qz qw]
-     * dx = [dp dv dth] = [dx dy dz dvx dvy dvz dthx dthy dthz]
-     * 
-     * pos_k = pos_{k-1} + vel_k * dt + (1/2) * (Rot(q_{k-1}) acc_{k-1}^{imu} - g) *dt^2
-     * vel_k = vel_{k-1} + (Rot(quat_{k-1})) acc_{k-1}^{imu} - g) *dt
-     * quat_k = Rot(w_{k-1}^{imu}*dt)*quat_{k-1}
-     * 
-     * covariance
-     * P_{k} = F_k P_{k-1} F_k^T + L Q_k L^T
-     */
-    void PfLocalizationComponent::predictUpdate(const sensor_msgs::msg::Imu input_imu_msg, const double dt_imu)
-    {
-        
-        
-        // state
-        Eigen::Quaterniond previous_quat = Eigen::Quaterniond(x_(STATE::QW), x_(STATE::QX), x_(STATE::QY), x_(STATE::QZ));
-        Eigen::MatrixXd rot_mat = previous_quat.toRotationMatrix();
-        Eigen::Vector3d acc = Eigen::Vector3d(input_imu_msg.linear_acceleration.x, input_imu_msg.linear_acceleration.y, input_imu_msg.linear_acceleration.z);
-        // pos
-        x_.segment(STATE::X, 3) = x_.segment(STATE::X, 3) + dt_imu * x_.segment(STATE::VX, 3) 
-                                            + 0.5 * dt_imu * dt_imu * (rot_mat * acc - gravity_); 
-        // vel
-        x_.segment(STATE::VX, 3) = x_.segment(STATE::VX, 3) + dt_imu * (rot_mat * acc - gravity_);
-        // quat 
-        Eigen::Quaterniond quat_wdt =  Eigen::Quaterniond(Eigen::AngleAxisd(input_imu_msg.angular_velocity.x * dt_imu, Eigen::Vector3d::UnitX()) 
-                                        * Eigen::AngleAxisd(input_imu_msg.angular_velocity.y * dt_imu, Eigen::Vector3d::UnitY())    
-                                        * Eigen::AngleAxisd(input_imu_msg.angular_velocity.z * dt_imu, Eigen::Vector3d::UnitZ()));  
-        Eigen::Quaterniond predicted_quat = quat_wdt * previous_quat;
-        x_.segment(STATE::QX, 4) = Eigen::Vector4d(predicted_quat.x(), predicted_quat.y(), predicted_quat.z(), predicted_quat.w());
-
-        // F
-        Eigen::MatrixXd F = Eigen::MatrixXd::Identity(num_error_state_,num_error_state_);
-        F.block<3,3>(0,3) = dt_imu *  Eigen::MatrixXd::Identity(3,3);
-        Eigen::Matrix3d acc_skew ;
-        acc_skew << 0      ,-acc(2), acc(1),
-                    acc(2) ,0      ,-acc(0),
-                    -acc(1),acc(0) ,0;
-        F.block<3,3>(3,6) = rot_mat *(-acc_skew) * dt_imu;
-        
-        // Q
-        Eigen::MatrixXd Q = Eigen::MatrixXd::Identity(6,6);
-        Q.block<3,3>(0, 0) = sigma_imu_acc_ * Q.block<3,3>(0, 0);
-        Q.block<3,3>(3, 3) = sigma_imu_w_ * Q.block<3,3>(3, 3);
-        Q = Q * (dt_imu * dt_imu);
-
-        // L
-        Eigen::MatrixXd L = Eigen::MatrixXd::Zero(9,6);
-        L.block<3,3>(3, 0) = Eigen::MatrixXd::Identity(3,3);
-        L.block<3,3>(6, 3) = Eigen::MatrixXd::Identity(3,3);
-
-        P_ = F * P_ * F.transpose() + L * Q * L.transpose();
-
-        return;
-    }
-
+    //TODO:like a Fast SLAM(estimaterのみでKFしてGaussian PFのように粒子をまき直したほうが効率良さそう？)
     /* 
      * y = pobs = [xobs yobs zobs]
      * 
@@ -418,7 +352,7 @@ namespace particle_filter_localization
         if(initial_pose_recieved_){
             Particle selected_posatt; 
             if(selected_estimator_ == "WeightedAverage"){
-                selected_posatt = pf_.getWeightAverage();
+                selected_posatt = pf_.getWeightedAverage();
             }
             else{
                 selected_posatt = pf_.getMAPestimate();

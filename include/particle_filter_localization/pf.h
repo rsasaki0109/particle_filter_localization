@@ -19,8 +19,18 @@ struct Particle
     Eigen::Vector3d pos;
     Eigen::Vector3d vec;
     Eigen::Quaterniond quat;
+    Eigen::Matrix<double,9,9> cov;
     double weight;
 
+    /*Particle() : pos(0, 0, 0),quat(1, 0, 0, 0),cov(1,0,0,0,0,0,0,0,0,
+                                                   0,1,0,0,0,0,0,0,0,
+                                                   0,0,1,0,0,0,0,0,0,
+                                                   0,0,0,1,0,0,0,0,0,
+                                                   0,0,0,0,1,0,0,0,0,
+                                                   0,0,0,0,0,1,0,0,0,
+                                                   0,0,0,0,0,0,1,0,0,
+                                                   0,0,0,0,0,0,0,1,0,
+                                                   0,0,0,0,0,0,0,0,1)*/
     Particle() : pos(0, 0, 0),quat(1, 0, 0, 0)
     {
 
@@ -36,18 +46,19 @@ public:
     void init(const int num_particles, const double initial_sigma_noize, const Particle initial_particle);
     void predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu);
     void update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
+    void update(const Eigen::Vector3d gnss_pose);
     void resample();
     void reset();
     void setMap(const pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr);
     Particle getMAPestimate();
-    Particle getWeightAverage();
+    Particle getWeightedAverage();
     std::vector<Particle> getParticles();
 
 private:
     std::vector<Particle> particles_;
-    int ind_MAP_;
-    double max_weight_;
 
+    int ind_MAP_;
+    
     pcl::KdTreeFLANN<pcl::PointXYZI> kdtree_;
 
     std::mt19937 random_seed_;//Mersenne twister
