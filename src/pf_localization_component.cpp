@@ -58,6 +58,9 @@ namespace particle_filter_localization
         declare_parameter("use_odom",false);
         get_parameter("use_odom",use_odom_);
 
+        declare_parameter("debug",false);
+        get_parameter("debug",debug_);
+
         set_on_parameters_set_callback(
         [this](const std::vector<rclcpp::Parameter> params) -> rcl_interfaces::msg::SetParametersResult 
         {
@@ -157,7 +160,7 @@ namespace particle_filter_localization
             initial_particle.quat.y() = current_pose_.pose.orientation.y;
             initial_particle.quat.z() = current_pose_.pose.orientation.z;
             initial_particle.quat.w() = current_pose_.pose.orientation.w;
-            pf_.init(num_particles_, var_initial_pose_, initial_particle);
+            pf_.init(num_particles_, var_initial_pose_,sigma_imu_w_, sigma_imu_acc_, initial_particle);
         };
 
         auto imu_callback =
@@ -209,7 +212,9 @@ namespace particle_filter_localization
                     gravity_.z() = alpha * gravity_.z() + (1 - alpha) * acc.z();
                     Eigen::Vector3d acc_gravity_corrected = acc - gravity_;
                     if(map_recieved_){
-                        pf_.predict(w, acc_gravity_corrected, dt_imu);   
+                        if(!debug_){
+                            pf_.predict(w, acc_gravity_corrected, dt_imu);
+                        }   
                     }
                 }
                 catch (tf2::TransformException& e){
@@ -251,6 +256,8 @@ namespace particle_filter_localization
 
         };
 
+        cloud_received_ = false;
+
         auto cloud_callback =
         [this](const typename sensor_msgs::msg::PointCloud2::SharedPtr msg) -> void
         {
@@ -273,7 +280,19 @@ namespace particle_filter_localization
                 vg_filter_.setInputCloud(cloud_ptr);
                 pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
                 vg_filter_.filter(*filtered_cloud_ptr);
-                measurementUpdate(filtered_cloud_ptr);
+
+                if(!cloud_received_){
+                    cloud_received_ = true;
+                    first_cloud_ += *filtered_cloud_ptr;
+                }
+                pcl::PointCloud<pcl::PointXYZI>::Ptr first_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>(first_cloud_));
+                
+                if(debug_){
+                    measurementUpdate(first_cloud_ptr);
+                }
+                else{
+                    measurementUpdate(filtered_cloud_ptr);
+                }
             }
         };
 

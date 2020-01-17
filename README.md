@@ -36,7 +36,7 @@ ros2 launch particle_filter_localization pf.launch.py
 ```
 
 ```
-ros2 topic pub pf_localization/initial_pose geometry_msgs/PoseStamped '{header: {stamp: {sec: 1476334344, nanosec: 561867202}, frame_id: "map"}, pose: {position: {x: 0.075144559145, y: -0.0197359323502}, orientation: {z: 0.999897136204, w: 0.0143428383376}}}' --once
+ros2 topic pub pf_localization/initial_pose geometry_msgs/PoseStamped '{pose: {position: {x: 0.075, y: -0.019}, orientation: {z: 0.9998, w: 0.0143}}}' --once
 ```
 
 ```

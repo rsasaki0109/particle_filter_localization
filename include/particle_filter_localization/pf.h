@@ -43,7 +43,8 @@ public:
     explicit ParticleFilter();
     virtual ~ParticleFilter();
 
-    void init(const int num_particles, const double initial_sigma_noize, const Particle initial_particle);
+    void init(const int num_particles, const double initial_sigma_noize,const double sigma_imu_w, 
+              const double sigma_imu_acc, const Particle initial_particle);
     void predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu);
     void update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr);
     void update(const Eigen::Vector3d gnss_pose);
@@ -53,6 +54,9 @@ public:
     Particle getMAPestimate();
     Particle getWeightedAverage();
     std::vector<Particle> getParticles();
+
+    void calcCov();
+    Eigen::Vector3d Quat2RotVec(Eigen::Quaterniond quat);
 
 private:
     std::vector<Particle> particles_;
@@ -64,6 +68,8 @@ private:
     std::mt19937 random_seed_;//Mersenne twister
 
     double kdtree_radius_;
+    double sigma_imu_w_;
+    double sigma_imu_acc_;
 
 };
 

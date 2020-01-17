@@ -148,6 +148,11 @@ namespace particle_filter_localization
           DVX  = 3,  DVY = 4,  DVZ = 5,
           DTHX = 6, DTHY = 7, DTHZ = 8,
         };
+
+        // debug
+        bool debug_;    
+        bool cloud_received_;      
+        pcl::PointCloud<pcl::PointXYZI> first_cloud_;  
     };
 }
 

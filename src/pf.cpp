@@ -8,9 +8,13 @@ namespace particle_filter_localization
     }
     ParticleFilter::~ParticleFilter(){}
 
-    void ParticleFilter::init(const int num_particles, const double initial_sigma_noize, const Particle initial_particle){
+    void ParticleFilter::init(const int num_particles, const double initial_sigma_noize,const double sigma_imu_w, 
+              const double sigma_imu_acc, const Particle initial_particle)
+    {
 
         kdtree_radius_ = 0.2;
+        sigma_imu_w_ = sigma_imu_w;
+        sigma_imu_acc_ = sigma_imu_acc;
 
         particles_.resize(num_particles);
         
@@ -50,8 +54,7 @@ namespace particle_filter_localization
     void ParticleFilter::predict(const Eigen::Vector3d imu_w, const Eigen::Vector3d imu_acc_gravity_corrected, const double dt_imu)
     {
         int num_particles = particles_.size();
-        double sigma_imu_w_ = 0.2;
-        double sigma_imu_acc_ = 0.2;
+        
         std::normal_distribution<double> addnoize_w(0, sigma_imu_w_);
         std::normal_distribution<double> addnoize_acc(0, sigma_imu_acc_);
         
@@ -73,7 +76,7 @@ namespace particle_filter_localization
             // quat 
             Eigen::Quaterniond predicted_quat = quat_wdt * previous_quat;
             particles_[i].quat = Eigen::Vector4d(predicted_quat.x(), predicted_quat.y(), predicted_quat.z(), predicted_quat.w());
-
+            
             // cov
             // F
             Eigen::Matrix<double,9,9> F = Eigen::MatrixXd::Identity(9,9);
@@ -100,43 +103,56 @@ namespace particle_filter_localization
 
     void ParticleFilter::update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
+        kdtree_radius_ = 0.2;
+        sigma_imu_w_ = 0.1;
+        sigma_imu_acc_ = 0.1;
+        //double weight_one_point = 0.001;//logexp
+        double weight_one_point = log(100)/295;
+        double ess_ratio = 1;
         //TODO:Likelihood function!!!!!!!
         double sum_weight = 0;
         double max_weight = 0;
         int num_particles = particles_.size();
         for (int i = 0; i< num_particles; i++){
-            //std::cout << "a" << std::endl;
-            //std::cout << particles_[i].weight << std::endl;
             Eigen::Matrix4f transform = (Eigen::Isometry3d(Eigen::Translation3d(particles_[i].pos.x(), particles_[i].pos.y(), particles_[i].pos.z())
 			                      * Eigen::Quaterniond(particles_[i].quat.w(), particles_[i].quat.x(), particles_[i].quat.y(), particles_[i].quat.z()))).matrix().cast<float>();
-            //std::cout << transform << std::endl;
             pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
             pcl::transformPointCloud(*cloud_ptr, *transformed_cloud_ptr, transform);
             int num_clouds = cloud_ptr->points.size();
-            double log_p = 0;
+            double sum_log_p = 0;
             for (int j = 0; j < num_clouds; j++){
-                //double sigma_lidar = 0.2;
+                double sigma_lidar = 0.2;
                 std::vector<int> pointIndices;
                 std::vector<float> pointDistances;
                 int num_searched = kdtree_.radiusSearch(transformed_cloud_ptr->points[j], kdtree_radius_, pointIndices, pointDistances, 1);
                 if(num_searched ==0){
-                    log_p -= sqrt(kdtree_radius_)/10;///10;
-                    //log_p -= 1.0 * (log(sqrt(M_PI))) - log(sigma_lidar) - ((kdtree_radius_ * kdtree_radius_)/(2* sigma_lidar * sigma_lidar));
-                    continue;//dist_max?
+                    //log_p -=  sqrt(kdtree_radius_)/20
+                    //log_p += (sqrt(kdtree_radius_) - sqrt(kdtree_radius_))/5;///10;
+                    //double log_p = (kdtree_radius_ - kdtree_radius_)*weight_one_point;///10;
+                    double log_p = (kdtree_radius_ - kdtree_radius_)*weight_one_point;
+                    //double log_p = -1.0 * log(sqrt(M_PI)) - log(sigma_lidar) - ((kdtree_radius_ * kdtree_radius_)/(2* sigma_lidar * sigma_lidar));
+                    //sum_log_p += log_p * weight_one_point;
+                    //std::cout << "max_log_p:" << log_p << std::endl;
+                    continue;
                 }
                 double dist = double(pointDistances[0]);
-                //std::cout << dist << std::endl;
-                //double sigma_lidar = 0.02;
                 //double p = 1.0 / sqrt(2.0 * M_PI * sigma_lidar * sigma_lidar) * exp(-dist * dist / (2 * sigma_lidar * sigma_lidar));
-                //double weight_one_point = 0.7;
                 //std::cout << p * weight_one_point << std::endl;
                 //particles_[i].weight = particles_[i].weight * p * weight_one_point;//addition better than multiplication?
-                log_p -= sqrt(dist)/10;
-                //log_p -= 1.0 * (log(sqrt(M_PI))) - log(sigma_lidar) - ((dist * dist)/(2* sigma_lidar * sigma_lidar));
+
+                //log_p += (sqrt(kdtree_radius_) - sqrt(dist))/5;
+                //double log_p = (kdtree_radius_ - dist)*weight_one_point;
+
+                double log_p = -1.0 * log(sqrt(M_PI))  - log(sigma_lidar) - ((dist * dist)/(2* sigma_lidar * sigma_lidar));
+                sum_log_p += log_p * weight_one_point;
+
+                //std::cout << "dist:" << dist << std::endl;
+                //std::cout << "log_p:" << log_p << std::endl;
             }
-            particles_[i].weight = exp(log_p);
-            //std::cout << log_p << std::endl;
-            //std::cout << particles_[i].weight << std::endl;//aaaaaaaaa
+            particles_[i].weight = exp(sum_log_p);
+            //particles_[i].weight = sum_log_p;
+            //std::cout << "sum_log_p:" << sum_log_p << std::endl;
+            //std::cout << "exp(sum_log_p)" << exp(sum_log_p) << std::endl;//aaaaaaaaa
             sum_weight += particles_[i].weight;
             if(max_weight < particles_[i].weight)
             {
@@ -152,12 +168,13 @@ namespace particle_filter_localization
         }
 
         int n_eff = int(1/ess_inverse); // Effective particle number
-        int n_thres = int(num_particles/2); 
+        int n_thres = int(num_particles * ess_ratio); 
         //std::cout << "n_eff" << std::endl;
         //std::cout << n_eff << std::endl;
         if(n_eff < n_thres)
         {
             //std::cout << "resample" << std::endl;
+            //std::cout << "-----------------" << std::endl;
             resample();
         }
     }
