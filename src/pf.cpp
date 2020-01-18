@@ -103,7 +103,8 @@ namespace particle_filter_localization
 
     void ParticleFilter::update(const pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr)
     {
-        kdtree_radius_ = 0.2;
+        //kdtree_radius_ = 0.2;
+        kdtree_radius_ = 0.5;
         sigma_imu_w_ = 0.1;
         sigma_imu_acc_ = 0.1;
         //double weight_one_point = 0.001;//logexp
@@ -135,6 +136,7 @@ namespace particle_filter_localization
                     //std::cout << "max_log_p:" << log_p << std::endl;
                     continue;
                 }
+                /*
                 double dist = double(pointDistances[0]);
                 //double p = 1.0 / sqrt(2.0 * M_PI * sigma_lidar * sigma_lidar) * exp(-dist * dist / (2 * sigma_lidar * sigma_lidar));
                 //std::cout << p * weight_one_point << std::endl;
@@ -148,6 +150,12 @@ namespace particle_filter_localization
 
                 //std::cout << "dist:" << dist << std::endl;
                 //std::cout << "log_p:" << log_p << std::endl;
+                */
+                for (auto dist:pointDistances)
+                {
+                    double log_p = -1.0 * log(sqrt(M_PI))  - log(sigma_lidar) - ((dist * dist)/(2* sigma_lidar * sigma_lidar));
+                    sum_log_p += log_p * weight_one_point;
+                }
             }
             particles_[i].weight = exp(sum_log_p);
             //particles_[i].weight = sum_log_p;
