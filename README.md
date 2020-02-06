@@ -32,6 +32,10 @@ wget https://openspur.org/~atsushi.w/dataset/mcl_3dl/short_test.bag
 ```
 
 ```
+rviz2 -d src/particle_filter_localization/config/pfl_demo.rviz
+```
+
+```
 ros2 launch particle_filter_localization pf.launch.py
 ```
 
